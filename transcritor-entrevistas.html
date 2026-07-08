@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1A2E22">
+<title>Transcritor de Entrevistas</title>
+<style>
+  :root{
+    --bg:#F7F5F0; --ink:#22271F; --ink-soft:#5C6355; --card:#FFFFFF;
+    --green:#1A2E22; --green-soft:#2E4A38; --accent:#C05621; --accent-soft:#FDF0E7;
+    --line:#E3E0D8; --ok:#2F6B46; --warn:#9A4E1C; --err:#A83232;
+    --radius:14px; --shadow:0 1px 3px rgba(34,39,31,.08),0 4px 14px rgba(34,39,31,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:Georgia,'Times New Roman',serif; background:var(--bg); color:var(--ink);
+    min-height:100vh; padding-bottom:env(safe-area-inset-bottom);
+  }
+  .ui{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+  header{
+    background:var(--green); color:#F2EFE7; padding:16px 18px 14px;
+    padding-top:calc(16px + env(safe-area-inset-top));
+  }
+  header h1{font-size:19px;font-weight:600;letter-spacing:.2px}
+  header p{font-size:12.5px;opacity:.75;margin-top:2px;font-family:-apple-system,sans-serif}
+  nav{
+    display:flex;background:var(--green);padding:0 10px;gap:2px;
+    border-bottom:1px solid rgba(255,255,255,.08)
+  }
+  nav button{
+    flex:1;background:none;border:none;color:rgba(242,239,231,.6);padding:11px 4px 13px;
+    font-size:13px;font-family:-apple-system,sans-serif;font-weight:500;cursor:pointer;
+    border-bottom:2.5px solid transparent;transition:color .15s
+  }
+  nav button.active{color:#F2EFE7;border-bottom-color:var(--accent)}
+  main{padding:18px 16px 40px;max-width:680px;margin:0 auto}
+  .screen{display:none}.screen.active{display:block}
+
+  /* ---- Gravação ---- */
+  .rec-shell{
+    background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:28px 20px 24px;text-align:center
+  }
+  .rec-title-input{
+    width:100%;border:none;border-bottom:1.5px solid var(--line);background:none;
+    font-family:Georgia,serif;font-size:17px;color:var(--ink);padding:6px 2px;text-align:center;
+    margin-bottom:22px;outline:none
+  }
+  .rec-title-input:focus{border-bottom-color:var(--accent)}
+  .rec-title-input::placeholder{color:#B7B3A6}
+  #timer{
+    font-size:44px;font-variant-numeric:tabular-nums;letter-spacing:1px;
+    font-family:-apple-system,sans-serif;font-weight:200;color:var(--ink)
+  }
+  #recState{font-size:13px;color:var(--ink-soft);margin-top:2px;font-family:-apple-system,sans-serif;min-height:18px}
+  .meter{
+    height:46px;display:flex;align-items:center;justify-content:center;gap:3px;margin:16px 0 20px
+  }
+  .meter span{
+    width:4px;height:6px;border-radius:2px;background:var(--line);transition:height .1s
+  }
+  .meter.live span{background:var(--accent)}
+  .rec-controls{display:flex;justify-content:center;gap:16px;align-items:center}
+  .btn-rec{
+    width:78px;height:78px;border-radius:50%;border:none;cursor:pointer;
+    background:var(--accent);color:#fff;font-size:15px;font-weight:600;
+    font-family:-apple-system,sans-serif;box-shadow:0 4px 14px rgba(192,86,33,.35);
+    transition:transform .1s
+  }
+  .btn-rec:active{transform:scale(.95)}
+  .btn-rec.recording{background:var(--err);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(168,50,50,.35)}50%{box-shadow:0 0 0 14px rgba(168,50,50,0)}}
+  .btn-side{
+    width:56px;height:56px;border-radius:50%;border:1.5px solid var(--line);background:var(--card);
+    color:var(--ink-soft);font-size:12px;font-family:-apple-system,sans-serif;font-weight:600;cursor:pointer
+  }
+  .btn-side:disabled{opacity:.35}
+  .rec-hint{margin-top:18px;font-size:12.5px;color:var(--ink-soft);font-family:-apple-system,sans-serif;line-height:1.5}
+  .gate-note{
+    margin-top:16px;background:var(--accent-soft);border-radius:10px;padding:10px 14px;
+    font-size:12.5px;color:var(--warn);font-family:-apple-system,sans-serif;text-align:left;line-height:1.5
+  }
+
+  /* ---- Lista ---- */
+  .card{
+    background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:15px 16px;margin-bottom:12px
+  }
+  .int-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .int-title{font-size:16.5px;font-weight:600;line-height:1.3}
+  .int-meta{font-size:12px;color:var(--ink-soft);margin-top:3px;font-family:-apple-system,sans-serif}
+  .status{
+    display:inline-block;font-size:11px;font-weight:600;font-family:-apple-system,sans-serif;
+    padding:3px 9px;border-radius:20px;margin-top:8px;letter-spacing:.2px
+  }
+  .st-gravada{background:#EEEBE2;color:var(--ink-soft)}
+  .st-transcrevendo{background:#FDF0E7;color:var(--warn)}
+  .st-concluida{background:#E4EFE8;color:var(--ok)}
+  .st-erro{background:#F7E4E4;color:var(--err)}
+  .int-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .btn{
+    border:none;border-radius:9px;padding:9px 15px;font-size:13.5px;font-weight:600;
+    font-family:-apple-system,sans-serif;cursor:pointer;transition:opacity .15s
+  }
+  .btn:active{opacity:.7}
+  .btn-primary{background:var(--green);color:#F2EFE7}
+  .btn-ghost{background:#EEEBE2;color:var(--ink)}
+  .btn-danger{background:none;color:var(--err);border:1px solid #EBC9C9}
+  .btn:disabled{opacity:.4;cursor:default}
+  .empty{
+    text-align:center;padding:48px 20px;color:var(--ink-soft);font-size:14.5px;line-height:1.6
+  }
+  .empty strong{color:var(--ink)}
+
+  /* ---- Transcrição ---- */
+  .tr-head{margin-bottom:14px}
+  .tr-head h2{font-size:19px;line-height:1.3}
+  .tr-head .int-meta{margin-top:4px}
+  .qgate{
+    border-radius:10px;padding:11px 14px;font-size:13px;font-family:-apple-system,sans-serif;
+    margin:12px 0;line-height:1.5
+  }
+  .qgate.pass{background:#E4EFE8;color:var(--ok)}
+  .qgate.fail{background:#FDF0E7;color:var(--warn)}
+  .seg{
+    background:var(--card);border-radius:12px;box-shadow:var(--shadow);
+    padding:12px 14px;margin-bottom:10px
+  }
+  .seg-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .seg-time{
+    font-size:11px;color:var(--ink-soft);font-family:-apple-system,sans-serif;
+    font-variant-numeric:tabular-nums;background:#F1EFE8;padding:2px 8px;border-radius:6px;
+    cursor:pointer;border:none
+  }
+  .seg-speaker{
+    font-size:12px;font-weight:700;font-family:-apple-system,sans-serif;border:none;
+    background:none;cursor:pointer;padding:2px 6px;border-radius:6px
+  }
+  .sp-0{color:var(--accent);background:var(--accent-soft)}
+  .sp-1{color:var(--green-soft);background:#E4EFE8}
+  .sp-2{color:#6B4E9A;background:#EEE8F7}
+  .sp-3{color:#1C6E8C;background:#E2F0F5}
+  .seg-text{
+    font-size:15.5px;line-height:1.65;outline:none;border-radius:6px;padding:2px
+  }
+  .seg-text:focus{background:#FBFAF6;box-shadow:inset 0 0 0 1.5px var(--line)}
+  .speaker-bar{
+    display:flex;gap:8px;margin:12px 0;flex-wrap:wrap;align-items:center
+  }
+  .speaker-bar label{font-size:12px;color:var(--ink-soft);font-family:-apple-system,sans-serif}
+  .speaker-bar input{
+    border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;
+    font-family:-apple-system,sans-serif;width:130px;background:var(--card)
+  }
+  .export-bar{display:flex;gap:8px;margin:16px 0 8px;flex-wrap:wrap}
+  audio{width:100%;margin:10px 0;border-radius:10px}
+
+  /* ---- Config ---- */
+  .field{margin-bottom:18px}
+  .field label{
+    display:block;font-size:13px;font-weight:600;font-family:-apple-system,sans-serif;
+    margin-bottom:6px;color:var(--ink)
+  }
+  .field input{
+    width:100%;border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;
+    font-size:14px;font-family:-apple-system,sans-serif;background:var(--card);outline:none
+  }
+  .field input:focus{border-color:var(--accent)}
+  .field .hint{font-size:12px;color:var(--ink-soft);margin-top:6px;font-family:-apple-system,sans-serif;line-height:1.5}
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#F2EFE7;padding:11px 20px;border-radius:30px;
+    font-size:13.5px;font-family:-apple-system,sans-serif;box-shadow:var(--shadow);
+    opacity:0;transition:opacity .25s;pointer-events:none;z-index:99;max-width:88vw;text-align:center
+  }
+  .toast.show{opacity:1}
+  .progress{
+    height:5px;background:#EEEBE2;border-radius:3px;overflow:hidden;margin-top:10px
+  }
+  .progress i{display:block;height:100%;background:var(--accent);width:0%;transition:width .3s}
+  @media (prefers-reduced-motion:reduce){
+    .btn-rec.recording{animation:none}
+    *{transition:none!important}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Transcritor de Entrevistas</h1>
+  <p>Pesquisa qualitativa · Português brasileiro · Whisper large-v3</p>
+</header>
+
+<nav>
+  <button class="active" data-screen="gravar">Gravar</button>
+  <button data-screen="entrevistas">Entrevistas</button>
+  <button data-screen="config">Configuração</button>
+</nav>
+
+<main>
+  <!-- GRAVAR -->
+  <section id="scr-gravar" class="screen active">
+    <div class="rec-shell">
+      <input type="text" id="recTitle" class="rec-title-input" placeholder="Título da entrevista (ex.: Entrevistado 03 — Hotel X)">
+      <div id="timer">00:00</div>
+      <div id="recState">Pronto para gravar</div>
+      <div class="meter" id="meter"></div>
+      <div class="rec-controls">
+        <button class="btn-side" id="btnPause" disabled>Pausar</button>
+        <button class="btn-rec" id="btnRec">Gravar</button>
+        <button class="btn-side" id="btnStop" disabled>Parar</button>
+      </div>
+      <div class="rec-hint">O áudio fica salvo neste aparelho. A transcrição é feita depois, na aba Entrevistas.</div>
+      <div class="gate-note"><strong>Critério de qualidade:</strong> grave no mínimo 5 minutos de fala para validar a transcrição. O app avisa se a duração ficar abaixo disso.</div>
+    </div>
+  </section>
+
+  <!-- ENTREVISTAS -->
+  <section id="scr-entrevistas" class="screen">
+    <div id="listArea"></div>
+  </section>
+
+  <!-- TRANSCRIÇÃO (detalhe) -->
+  <section id="scr-transcricao" class="screen">
+    <button class="btn btn-ghost ui" id="btnBack" style="margin-bottom:14px">← Voltar</button>
+    <div id="trArea"></div>
+  </section>
+
+  <!-- CONFIG -->
+  <section id="scr-config" class="screen">
+    <div class="card">
+      <div class="field">
+        <label for="apiKey">Chave da API Groq</label>
+        <input type="password" id="apiKey" placeholder="gsk_..." autocomplete="off">
+        <div class="hint">Obtida em console.groq.com → API Keys. A chave fica salva apenas neste navegador, neste aparelho. Nunca é enviada a outro lugar além da API do Groq.</div>
+      </div>
+      <button class="btn btn-primary ui" id="btnSaveKey">Salvar chave</button>
+    </div>
+    <div class="card">
+      <div class="field" style="margin-bottom:0">
+        <label>Sobre este app</label>
+        <div class="hint">
+          Transcrição: Groq · Whisper large-v3 · idioma fixado em português.<br>
+          Áudios longos são divididos em blocos de ~10 minutos e as transcrições são unidas na ordem correta.<br>
+          Dados (áudio e transcrições) armazenados localmente via IndexedDB — excluir uma entrevista remove tudo de forma definitiva.<br>
+          Diarização automática não disponível no Groq: use os rótulos de falante manuais em cada trecho (toque no rótulo para alternar).
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ Estado & armazenamento (IndexedDB) ============ */
+const DB_NAME='transcritor-db', STORE='interviews';
+let db=null;
+function openDB(){return new Promise((res,rej)=>{
+  const r=indexedDB.open(DB_NAME,1);
+  r.onupgradeneeded=()=>r.result.createObjectStore(STORE,{keyPath:'id'});
+  r.onsuccess=()=>{db=r.result;res()};
+  r.onerror=()=>rej(r.error);
+})}
+function dbPut(item){return new Promise((res,rej)=>{
+  const t=db.transaction(STORE,'readwrite');t.objectStore(STORE).put(item);
+  t.oncomplete=res;t.onerror=()=>rej(t.error);
+})}
+function dbAll(){return new Promise((res,rej)=>{
+  const r=db.transaction(STORE).objectStore(STORE).getAll();
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
+})}
+function dbGet(id){return new Promise((res,rej)=>{
+  const r=db.transaction(STORE).objectStore(STORE).get(id);
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
+})}
+function dbDel(id){return new Promise((res,rej)=>{
+  const t=db.transaction(STORE,'readwrite');t.objectStore(STORE).delete(id);
+  t.oncomplete=res;t.onerror=()=>rej(t.error);
+})}
+
+/* ============ Utilidades ============ */
+const $=s=>document.querySelector(s);
+function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),ms)}
+function fmtTime(s){s=Math.max(0,Math.floor(s));const m=Math.floor(s/60),ss=s%60;return String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0')}
+function fmtTimeH(s){s=Math.max(0,Math.floor(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(ss).padStart(2,'0')}
+function fmtDate(ts){return new Date(ts).toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'})+' · '+new Date(ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+const MIN_QUALITY_SEC = 5*60;
+
+/* ============ Navegação ============ */
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>showScreen(b.dataset.screen,b)));
+function showScreen(name,navBtn){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $('#scr-'+name).classList.add('active');
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  if(navBtn)navBtn.classList.add('active');
+  else{const nb=document.querySelector(`nav button[data-screen="${name}"]`);if(nb)nb.classList.add('active')}
+  if(name==='entrevistas')renderList();
+}
+$('#btnBack').addEventListener('click',()=>showScreen('entrevistas'));
+
+/* ============ Gravação ============ */
+let mediaRecorder=null,chunks=[],recStart=0,pausedTotal=0,pauseAt=0,timerInt=null,audioCtx=null,analyser=null,meterInt=null,stream=null;
+const meterEl=$('#meter');
+for(let i=0;i<24;i++)meterEl.appendChild(document.createElement('span'));
+
+$('#btnRec').addEventListener('click',async()=>{
+  if(mediaRecorder&&mediaRecorder.state!=='inactive')return;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});
+  }catch(e){toast('Acesso ao microfone negado. Permita nas configurações do navegador.');return}
+  chunks=[];pausedTotal=0;
+  const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':
+             (MediaRecorder.isTypeSupported('audio/mp4')?'audio/mp4':'');
+  mediaRecorder=new MediaRecorder(stream,mime?{mimeType:mime,audioBitsPerSecond:48000}:{});
+  mediaRecorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  mediaRecorder.onstop=onRecStop;
+  mediaRecorder.start(1000);
+  recStart=Date.now();
+  timerInt=setInterval(updTimer,300);
+  startMeter();
+  $('#btnRec').textContent='Gravando';$('#btnRec').classList.add('recording');
+  $('#btnPause').disabled=false;$('#btnStop').disabled=false;
+  $('#recState').textContent='Gravando…';
+});
+$('#btnPause').addEventListener('click',()=>{
+  if(!mediaRecorder)return;
+  if(mediaRecorder.state==='recording'){
+    mediaRecorder.pause();pauseAt=Date.now();
+    $('#btnPause').textContent='Retomar';$('#recState').textContent='Pausado';
+    meterEl.classList.remove('live');
+  }else if(mediaRecorder.state==='paused'){
+    mediaRecorder.resume();pausedTotal+=Date.now()-pauseAt;
+    $('#btnPause').textContent='Pausar';$('#recState').textContent='Gravando…';
+  }
+});
+$('#btnStop').addEventListener('click',()=>{if(mediaRecorder&&mediaRecorder.state!=='inactive')mediaRecorder.stop()});
+
+function updTimer(){
+  const elapsed=(Date.now()-recStart-pausedTotal-(mediaRecorder&&mediaRecorder.state==='paused'?Date.now()-pauseAt:0))/1000;
+  $('#timer').textContent=fmtTime(elapsed);
+}
+function startMeter(){
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  const src=audioCtx.createMediaStreamSource(stream);
+  analyser=audioCtx.createAnalyser();analyser.fftSize=64;src.connect(analyser);
+  const data=new Uint8Array(analyser.frequencyBinCount);
+  meterEl.classList.add('live');
+  meterInt=setInterval(()=>{
+    if(mediaRecorder&&mediaRecorder.state==='recording'){
+      analyser.getByteFrequencyData(data);
+      const bars=meterEl.children;
+      for(let i=0;i<bars.length;i++){
+        const v=data[Math.floor(i*data.length/bars.length)]/255;
+        bars[i].style.height=(6+v*34)+'px';
+      }
+    }
+  },100);
+}
+async function onRecStop(){
+  clearInterval(timerInt);clearInterval(meterInt);
+  if(audioCtx){audioCtx.close();audioCtx=null}
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+  meterEl.classList.remove('live');
+  Array.from(meterEl.children).forEach(b=>b.style.height='6px');
+  const durSec=(Date.now()-recStart-pausedTotal)/1000;
+  const blob=new Blob(chunks,{type:chunks[0]?.type||'audio/webm'});
+  const title=$('#recTitle').value.trim()||('Entrevista '+new Date().toLocaleDateString('pt-BR'));
+  const item={
+    id:'int_'+Date.now(), title, createdAt:Date.now(), durationSec:Math.round(durSec),
+    audio:blob, mime:blob.type, status:'gravada',
+    segments:null, speakerNames:{0:'Falante 1',1:'Falante 2',2:'Falante 3',3:'Falante 4'}, error:null
+  };
+  await dbPut(item);
+  $('#btnRec').textContent='Gravar';$('#btnRec').classList.remove('recording');
+  $('#btnPause').disabled=true;$('#btnPause').textContent='Pausar';$('#btnStop').disabled=true;
+  $('#timer').textContent='00:00';$('#recState').textContent='Pronto para gravar';
+  $('#recTitle').value='';
+  if(durSec<MIN_QUALITY_SEC){
+    toast('Gravação salva ('+fmtTime(durSec)+'). Atenção: abaixo do critério de 5 min para validação de qualidade.',4200);
+  }else{
+    toast('Gravação salva ('+fmtTime(durSec)+').');
+  }
+  showScreen('entrevistas');
+}
+
+/* ============ Lista ============ */
+async function renderList(){
+  const items=(await dbAll()).sort((a,b)=>b.createdAt-a.createdAt);
+  const area=$('#listArea');
+  if(!items.length){
+    area.innerHTML='<div class="empty ui"><strong>Nenhuma entrevista ainda.</strong><br>Grave a primeira na aba Gravar. Ela aparecerá aqui, pronta para transcrever.</div>';
+    return;
+  }
+  area.innerHTML=items.map(it=>{
+    const st={gravada:['st-gravada','Gravada'],transcrevendo:['st-transcrevendo','Transcrevendo…'],concluida:['st-concluida','Transcrita'],erro:['st-erro','Erro']}[it.status]||['st-gravada',it.status];
+    return `<div class="card" data-id="${it.id}">
+      <div class="int-row"><div>
+        <div class="int-title">${esc(it.title)}</div>
+        <div class="int-meta">${fmtDate(it.createdAt)} · ${fmtTime(it.durationSec)}${it.durationSec<MIN_QUALITY_SEC?' · <span style="color:var(--warn)">abaixo de 5 min</span>':''}</div>
+        <span class="status ${st[0]}">${st[1]}</span>
+        ${it.error?`<div class="int-meta" style="color:var(--err);margin-top:6px">${esc(it.error)}</div>`:''}
+      </div></div>
+      <div class="progress" style="display:${it.status==='transcrevendo'?'block':'none'}"><i id="pg-${it.id}"></i></div>
+      <div class="int-actions">
+        ${it.status==='concluida'
+          ?`<button class="btn btn-primary ui" data-act="ver">Abrir transcrição</button>`
+          :`<button class="btn btn-primary ui" data-act="transcrever" ${it.status==='transcrevendo'?'disabled':''}>${it.status==='erro'?'Tentar novamente':'Transcrever'}</button>`}
+        <button class="btn btn-ghost ui" data-act="renomear">Renomear</button>
+        <button class="btn btn-danger ui" data-act="excluir">Excluir</button>
+      </div>
+    </div>`;
+  }).join('');
+  area.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',async e=>{
+    const id=e.target.closest('.card').dataset.id, act=e.target.dataset.act;
+    if(act==='transcrever')transcribe(id);
+    if(act==='ver')openTranscript(id);
+    if(act==='renomear'){
+      const it=await dbGet(id);
+      const n=prompt('Novo título:',it.title);
+      if(n&&n.trim()){it.title=n.trim();await dbPut(it);renderList()}
+    }
+    if(act==='excluir'){
+      if(confirm('Excluir esta entrevista? O áudio e a transcrição serão removidos definitivamente deste aparelho.')){
+        await dbDel(id);toast('Entrevista excluída.');renderList();
+      }
+    }
+  }));
+}
+
+/* ============ Transcrição via Groq ============ */
+const CHUNK_SEC=600; // ~10 min por bloco
+async function transcribe(id){
+  const key=localStorage.getItem('groqKey');
+  if(!key){toast('Configure a chave da API Groq primeiro (aba Configuração).');showScreen('config');return}
+  const it=await dbGet(id);
+  it.status='transcrevendo';it.error=null;await dbPut(it);renderList();
+  const pg=()=>document.getElementById('pg-'+id);
+  try{
+    // Decodifica e fatia o áudio em blocos WAV de até CHUNK_SEC
+    const arrBuf=await it.audio.arrayBuffer();
+    const ac=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});
+    const decoded=await ac.decodeAudioData(arrBuf.slice(0));
+    const totalSec=decoded.duration;
+    const nChunks=Math.max(1,Math.ceil(totalSec/CHUNK_SEC));
+    let allSegments=[];
+    for(let c=0;c<nChunks;c++){
+      const startS=c*CHUNK_SEC, endS=Math.min(totalSec,(c+1)*CHUNK_SEC);
+      const wav=sliceToWav(decoded,startS,endS);
+      const segs=await groqTranscribe(wav,key);
+      segs.forEach(s=>allSegments.push({start:s.start+startS,end:s.end+startS,text:s.text.trim(),speaker:0}));
+      if(pg())pg().style.width=Math.round((c+1)/nChunks*100)+'%';
+    }
+    ac.close();
+    // Gate de qualidade
+    allSegments=allSegments.filter(s=>s.text&&s.text.length);
+    if(!allSegments.length)throw new Error('A transcrição voltou vazia. Verifique se o áudio contém fala audível e tente novamente.');
+    const lastEnd=allSegments[allSegments.length-1].end;
+    if(lastEnd < totalSec*0.6)throw new Error('Transcrição possivelmente truncada (cobriu apenas '+fmtTime(lastEnd)+' de '+fmtTime(totalSec)+'). Tente novamente.');
+    it.segments=allSegments;
+    it.durationSec=Math.round(totalSec);
+    it.status='concluida';
+    it.qualityGate={
+      minDuration: totalSec>=MIN_QUALITY_SEC,
+      nonEmpty: true,
+      coverage: lastEnd/totalSec
+    };
+    await dbPut(it);
+    toast('Transcrição concluída.');
+    renderList();
+  }catch(err){
+    it.status='erro';
+    it.error=(err&&err.message)?err.message:'Falha na transcrição.';
+    await dbPut(it);renderList();
+  }
+}
+async function groqTranscribe(wavBlob,key){
+  const fd=new FormData();
+  fd.append('file',wavBlob,'audio.wav');
+  fd.append('model','whisper-large-v3');
+  fd.append('language','pt');
+  fd.append('response_format','verbose_json');
+  const resp=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
+    method:'POST',headers:{'Authorization':'Bearer '+key},body:fd
+  });
+  if(!resp.ok){
+    let msg='Erro '+resp.status+' na API Groq.';
+    try{const j=await resp.json();if(j.error&&j.error.message)msg=j.error.message}catch(_){}
+    if(resp.status===401)msg='Chave da API inválida. Verifique na aba Configuração.';
+    if(resp.status===429)msg='Limite de requisições atingido. Aguarde alguns minutos e tente novamente.';
+    throw new Error(msg);
+  }
+  const j=await resp.json();
+  if(j.segments&&j.segments.length)return j.segments.map(s=>({start:s.start,end:s.end,text:s.text}));
+  if(j.text)return [{start:0,end:0,text:j.text}];
+  return [];
+}
+function sliceToWav(buf,startS,endS){
+  const sr=buf.sampleRate;
+  const s0=Math.floor(startS*sr), s1=Math.min(buf.length,Math.floor(endS*sr));
+  const len=s1-s0;
+  // mixdown para mono
+  const mono=new Float32Array(len);
+  for(let ch=0;ch<buf.numberOfChannels;ch++){
+    const d=buf.getChannelData(ch);
+    for(let i=0;i<len;i++)mono[i]+=d[s0+i]/buf.numberOfChannels;
+  }
+  const bytes=44+len*2, ab=new ArrayBuffer(bytes), v=new DataView(ab);
+  const wS=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+  wS(0,'RIFF');v.setUint32(4,36+len*2,true);wS(8,'WAVE');wS(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
+  wS(36,'data');v.setUint32(40,len*2,true);
+  for(let i=0;i<len;i++){const x=Math.max(-1,Math.min(1,mono[i]));v.setInt16(44+i*2,x<0?x*0x8000:x*0x7FFF,true)}
+  return new Blob([ab],{type:'audio/wav'});
+}
+
+/* ============ Tela de transcrição ============ */
+let currentId=null,audioURL=null;
+async function openTranscript(id){
+  currentId=id;
+  const it=await dbGet(id);
+  if(audioURL)URL.revokeObjectURL(audioURL);
+  audioURL=URL.createObjectURL(it.audio);
+  const q=it.qualityGate||{};
+  const gateOK=q.minDuration&&q.nonEmpty;
+  const area=$('#trArea');
+  area.innerHTML=`
+    <div class="tr-head">
+      <h2>${esc(it.title)}</h2>
+      <div class="int-meta ui">${fmtDate(it.createdAt)} · ${fmtTime(it.durationSec)} · ${it.segments.length} trechos</div>
+    </div>
+    <div class="qgate ${gateOK?'pass':'fail'}">
+      ${gateOK
+        ?'✓ Critério de qualidade atendido: áudio ≥ 5 min, transcrição completa com timestamps. Revise o texto abaixo e confirme a atribuição de falantes.'
+        :'⚠ Critério de qualidade não atendido: '+(q.minDuration?'':'áudio abaixo de 5 minutos. ')+'Use esta transcrição apenas como teste — grave 5+ min para validação.'}
+    </div>
+    <audio controls id="player" src="${audioURL}"></audio>
+    <div class="speaker-bar ui">
+      <label>Falantes:</label>
+      <input value="${esc(it.speakerNames[0])}" data-sp="0">
+      <input value="${esc(it.speakerNames[1])}" data-sp="1">
+    </div>
+    <div class="int-meta ui" style="margin-bottom:12px">Toque no rótulo do falante em um trecho para alternar. Toque no horário para ouvir dali. Toque no texto para editar.</div>
+    <div id="segList"></div>
+    <div class="export-bar">
+      <button class="btn btn-primary ui" id="expDocx">Exportar DOCX</button>
+      <button class="btn btn-ghost ui" id="expTxt">TXT</button>
+      <button class="btn btn-ghost ui" id="expSrt">SRT</button>
+    </div>`;
+  renderSegs(it);
+  area.querySelectorAll('.speaker-bar input').forEach(inp=>inp.addEventListener('change',async()=>{
+    const it2=await dbGet(currentId);
+    it2.speakerNames[inp.dataset.sp]=inp.value.trim()||('Falante '+(1+ +inp.dataset.sp));
+    await dbPut(it2);renderSegs(it2);
+  }));
+  $('#expDocx').addEventListener('click',()=>exportDocx());
+  $('#expTxt').addEventListener('click',()=>exportTxt());
+  $('#expSrt').addEventListener('click',()=>exportSrt());
+  showScreen('transcricao');
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+}
+function renderSegs(it){
+  const list=$('#segList');
+  list.innerHTML=it.segments.map((s,i)=>`
+    <div class="seg" data-i="${i}">
+      <div class="seg-top">
+        <button class="seg-time ui" data-t="${s.start}">${fmtTime(s.start)}</button>
+        <button class="seg-speaker sp-${s.speaker%4} ui">${esc(it.speakerNames[s.speaker]||('Falante '+(s.speaker+1)))}</button>
+      </div>
+      <div class="seg-text" contenteditable="true" spellcheck="false">${esc(s.text)}</div>
+    </div>`).join('');
+  list.querySelectorAll('.seg-time').forEach(b=>b.addEventListener('click',()=>{
+    const p=$('#player');p.currentTime=parseFloat(b.dataset.t);p.play();
+  }));
+  list.querySelectorAll('.seg-speaker').forEach((b,idx)=>b.addEventListener('click',async()=>{
+    const it2=await dbGet(currentId);
+    it2.segments[idx].speaker=(it2.segments[idx].speaker+1)%2;
+    await dbPut(it2);renderSegs(it2);
+  }));
+  list.querySelectorAll('.seg-text').forEach((el,idx)=>el.addEventListener('blur',async()=>{
+    const it2=await dbGet(currentId);
+    const t=el.textContent.trim();
+    if(t){it2.segments[idx].text=t;await dbPut(it2)}
+    else{el.textContent=it2.segments[idx].text}
+  }));
+}
+
+/* ============ Exportação ============ */
+async function currentInterview(){return dbGet(currentId)}
+function download(blob,name){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+function safeName(t){return t.replace(/[^\p{L}\p{N} _-]/gu,'').trim().replace(/\s+/g,'_').slice(0,60)||'entrevista'}
+async function exportTxt(){
+  const it=await currentInterview();
+  const lines=it.segments.map(s=>`[${fmtTimeH(s.start)}] ${it.speakerNames[s.speaker]}: ${s.text}`);
+  download(new Blob([`${it.title}\n${fmtDate(it.createdAt)} · duração ${fmtTime(it.durationSec)}\n\n`+lines.join('\n\n')],{type:'text/plain;charset=utf-8'}),safeName(it.title)+'.txt');
+  toast('TXT exportado.');
+}
+async function exportSrt(){
+  const it=await currentInterview();
+  const t2=s=>{const ms=Math.round((s%1)*1000);return fmtTimeH(s)+','+String(ms).padStart(3,'0')};
+  const srt=it.segments.map((s,i)=>`${i+1}\n${t2(s.start)} --> ${t2(s.end||s.start+3)}\n${it.speakerNames[s.speaker]}: ${s.text}\n`).join('\n');
+  download(new Blob([srt],{type:'text/plain;charset=utf-8'}),safeName(it.title)+'.srt');
+  toast('SRT exportado.');
+}
+async function exportDocx(){
+  // DOCX mínimo válido (WordprocessingML) empacotado como ZIP sem compressão
+  const it=await currentInterview();
+  const parasXml=[
+    `<w:p><w:pPr><w:pStyle w:val="Ttulo"/></w:pPr><w:r><w:rPr><w:b/><w:sz w:val="32"/></w:rPr><w:t xml:space="preserve">${xmlEsc(it.title)}</w:t></w:r></w:p>`,
+    `<w:p><w:r><w:rPr><w:color w:val="666666"/><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">${xmlEsc(fmtDate(it.createdAt))} · duração ${fmtTime(it.durationSec)} · transcrição automática (Whisper large-v3 via Groq), revisada manualmente</w:t></w:r></w:p>`,
+    `<w:p/>`
+  ].concat(it.segments.map(s=>
+    `<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${xmlEsc(it.speakerNames[s.speaker])} [${fmtTimeH(s.start)}]: </w:t></w:r><w:r><w:t xml:space="preserve">${xmlEsc(s.text)}</w:t></w:r></w:p>`
+  )).join('');
+  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${parasXml}<w:sectPr/></w:body></w:document>`;
+  const contentTypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+  const rels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const zip=buildZip([
+    {name:'[Content_Types].xml',data:contentTypes},
+    {name:'_rels/.rels',data:rels},
+    {name:'word/document.xml',data:docXml}
+  ]);
+  download(new Blob([zip],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),safeName(it.title)+'.docx');
+  toast('DOCX exportado — pronto para importar no NVivo/ATLAS.ti.');
+}
+function xmlEsc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+/* ZIP "stored" (sem compressão) com CRC32 — suficiente para DOCX */
+function buildZip(files){
+  const enc=new TextEncoder();
+  const crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c}return t})();
+  const crc32=d=>{let c=0xFFFFFFFF;for(let i=0;i<d.length;i++)c=crcTable[(c^d[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0};
+  let local=[],central=[],offset=0;
+  for(const f of files){
+    const name=enc.encode(f.name),data=enc.encode(f.data),crc=crc32(data);
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0,true);lh.setUint16(8,0,true);
+    lh.setUint16(10,0,true);lh.setUint16(12,0,true);lh.setUint32(14,crc,true);
+    lh.setUint32(18,data.length,true);lh.setUint32(22,data.length,true);
+    lh.setUint16(26,name.length,true);lh.setUint16(28,0,true);
+    local.push(new Uint8Array(lh.buffer),name,data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);
+    ch.setUint32(16,crc,true);ch.setUint32(20,data.length,true);ch.setUint32(24,data.length,true);
+    ch.setUint16(28,name.length,true);ch.setUint32(42,offset,true);
+    central.push(new Uint8Array(ch.buffer),name);
+    offset+=30+name.length+data.length;
+  }
+  const centralSize=central.reduce((a,b)=>a+b.length,0);
+  const end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true);end.setUint16(8,files.length,true);end.setUint16(10,files.length,true);
+  end.setUint32(12,centralSize,true);end.setUint32(16,offset,true);
+  const parts=[...local,...central,new Uint8Array(end.buffer)];
+  const total=parts.reduce((a,b)=>a+b.length,0);
+  const out=new Uint8Array(total);let p=0;
+  for(const part of parts){out.set(part,p);p+=part.length}
+  return out;
+}
+
+/* ============ Config ============ */
+$('#btnSaveKey').addEventListener('click',()=>{
+  const k=$('#apiKey').value.trim();
+  if(!k.startsWith('gsk_')){toast('A chave do Groq começa com gsk_. Verifique e cole novamente.');return}
+  localStorage.setItem('groqKey',k);
+  toast('Chave salva neste aparelho.');
+});
+
+/* ============ Init ============ */
+openDB().then(()=>{
+  const k=localStorage.getItem('groqKey');
+  if(k)$('#apiKey').value=k;
+  renderList();
+});
+</script>
+</body>
+</html>
